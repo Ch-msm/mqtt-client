@@ -1,0 +1,6 @@
+# mqtt-client 测试代理配置文件
+# 可以使用mosquitto代理服务器进行测试
+# 安装命令：sudo apt-get install mosquitto mosquitto-clients
+
+listener 1883
+allow_anonymous true 
