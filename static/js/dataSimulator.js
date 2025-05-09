@@ -50,12 +50,21 @@
 
     function _handleRandomNumber(expression) {
         if (expression.startsWith("随机数 ")) {
-            const paramsString = expression.substring("随机数 ".length);
-            const parts = paramsString.split("-");
-            if (parts.length === 2) {
-                const min = parseInt(parts[0].trim(), 10);
-                const max = parseInt(parts[1].trim(), 10);
-                if (!isNaN(min) && !isNaN(max) && min <= max) {
+            const paramsString = expression.substring("随机数 ".length).trim();
+            
+            // 使用正则表达式匹配数字范围，支持负数
+            // 格式为：数字1-数字2，其中数字1和数字2可以是负数
+            const rangeMatch = paramsString.match(/^(-?\d+)-(-?\d+)$/);
+            
+            if (rangeMatch) {
+                const num1 = parseInt(rangeMatch[1], 10);
+                const num2 = parseInt(rangeMatch[2], 10);
+                
+                if (!isNaN(num1) && !isNaN(num2)) {
+                    // 确保较小的值作为最小值，较大的值作为最大值
+                    const min = Math.min(num1, num2);
+                    const max = Math.max(num1, num2);
+                    
                     return String(Math.floor(Math.random() * (max - min + 1)) + min);
                 }
             }
