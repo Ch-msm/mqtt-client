@@ -1,6 +1,18 @@
 /**
  * dataSimulator.js
  * 一个用于在字符串中替换模板表达式为动态数据的工具。
+ * 
+ * 支持的模板表达式：
+ * 1. [当前时间戳-秒] - 返回当前的UNIX时间戳（秒）
+ * 2. [当前时间戳-毫秒] - 返回当前的UNIX时间戳（毫秒）
+ * 3. [随机数 min-max] - 返回指定范围内的随机整数，支持负数，例如: [随机数 -10-20]
+ * 4. [随机浮点数 min-max precision] - 返回指定范围内的随机浮点数，precision为可选参数表示小数位数(默认2位)
+ *    例如: [随机浮点数 0-1 3] 生成0到1之间带3位小数的随机数，如0.123
+ *    例如: [随机浮点数 -5.5-10.8] 生成-5.5到10.8之间带2位小数的随机数，如2.34
+ * 5. [日期格式 format] - 返回按指定格式格式化的当前日期，支持: YYYY, MM, DD, HH, mm, ss, SSS
+ *    例如: [日期格式 YYYY-MM-DD HH:mm:ss]
+ * 6. [自增ID 键名 起始值 步长] - 返回自增ID，可指定键名、起始值和步长
+ *    例如: [自增ID user 100 1] 生成从100开始，步长为1的自增ID
  */
 
 (function(global) {
@@ -49,6 +61,7 @@
     }
 
     function _handleRandomNumber(expression) {
+        // 处理整数随机数
         if (expression.startsWith("随机数 ")) {
             const paramsString = expression.substring("随机数 ".length).trim();
             
@@ -68,7 +81,52 @@
                     return String(Math.floor(Math.random() * (max - min + 1)) + min);
                 }
             }
+            return null; // 格式不匹配或数字解析错误
         }
+
+        // 处理浮点数随机数
+        if (expression.startsWith("随机浮点数 ")) {
+            try {
+                const paramsString = expression.substring("随机浮点数 ".length).trim();
+                
+                // 匹配格式: "min-max [precision]"
+                // 例如: "0-1 2" 表示0到1之间带2位小数的随机数
+                const parts = paramsString.split(/\s+/);
+                const rangeString = parts[0];
+                const precision = parts.length > 1 ? parseInt(parts[1], 10) : 2; // 默认2位小数
+                
+                if (isNaN(precision) || precision < 0) {
+                    console.warn("随机浮点数精度无效:", parts[1]);
+                    return null; // 精度必须是非负整数
+                }
+                
+                // 解析范围，支持浮点数和负数
+                const rangeMatch = rangeString.match(/^(-?\d*\.?\d+)-(-?\d*\.?\d+)$/);
+                if (rangeMatch) {
+                    const num1 = parseFloat(rangeMatch[1]);
+                    const num2 = parseFloat(rangeMatch[2]);
+                    
+                    if (!isNaN(num1) && !isNaN(num2)) {
+                        // 确保较小的值作为最小值，较大的值作为最大值
+                        const min = Math.min(num1, num2);
+                        const max = Math.max(num1, num2);
+                        
+                        // 生成随机浮点数并根据指定的精度四舍五入
+                        const randomValue = min + Math.random() * (max - min);
+                        return randomValue.toFixed(precision);
+                    } else {
+                        console.warn("随机浮点数范围解析失败:", rangeString);
+                    }
+                } else {
+                    console.warn("随机浮点数范围格式无效:", rangeString);
+                }
+            } catch (err) {
+                console.error("随机浮点数处理错误:", err);
+            }
+            
+            return null; // 如果有任何错误，返回null
+        }
+        
         return null; // 不是一个被识别的随机数表达式或参数无效
     }
 
@@ -145,6 +203,14 @@
 
     /**
      * 处理模板字符串并用动态数据替换表达式。
+     * 支持的表达式:
+     * 1. [当前时间戳-秒] - 当前UNIX时间戳(秒)
+     * 2. [当前时间戳-毫秒] - 当前UNIX时间戳(毫秒)
+     * 3. [随机数 min-max] - 指定范围内的随机整数，支持负数
+     * 4. [随机浮点数 min-max precision] - 指定范围内的随机浮点数，precision为可选参数(默认2位小数)
+     * 5. [日期格式 format] - 按指定格式的当前日期
+     * 6. [自增ID 键名 起始值 步长] - 自增ID生成
+     * 
      * @param {string} templateString - 包含模板表达式的字符串。
      * @param {object} [context={}] - 可选的上下文对象，用于在调用之间维护状态（例如，自增 ID）。
      * @returns {string} 处理后的字符串，表达式已被替换。
@@ -155,44 +221,76 @@
             return templateString;
         }
 
+        // 添加调试日志
+        console.log("处理模板字符串:", templateString);
+
         // 自增 ID 的缓存，以确保在此单次调用中的幂等性
         const singleCallAutoIncrementCache = {};
 
-        return templateString.replace(/\[(.*?)\]/g, (match, expression) => {
+        const result = templateString.replace(/\[(.*?)\]/g, (match, expression) => {
             expression = expression.trim();
+            console.log("处理表达式:", expression);
+            
             let replacement = null;
 
             // 尝试时间戳处理
             replacement = _handleTimestamp(expression);
-            if (replacement !== null) return replacement;
+            if (replacement !== null) {
+                console.log("时间戳替换:", replacement);
+                return replacement;
+            }
 
             // 尝试随机数处理
             replacement = _handleRandomNumber(expression);
-            if (replacement !== null) return replacement;
+            if (replacement !== null) {
+                console.log("随机数替换:", replacement);
+                return replacement;
+            }
 
             // 尝试日期格式处理
             replacement = _handleDateFormat(expression);
-            if (replacement !== null) return replacement;
+            if (replacement !== null) {
+                console.log("日期格式替换:", replacement);
+                return replacement;
+            }
 
             // 尝试自增 ID 处理
             replacement = _handleAutoIncrementId(expression, context, singleCallAutoIncrementCache);
-            if (replacement !== null) return replacement;
+            if (replacement !== null) {
+                console.log("自增ID替换:", replacement);
+                return replacement;
+            }
 
             // 如果没有处理匹配，返回原始匹配
+            console.log("无匹配，返回原始:", match);
             return match;
         });
+        
+        console.log("处理结果:", result);
+        return result;
     }
 
     // --- 导出 ---
+    // 包装processTemplate以增加错误处理
+    function safeProcessTemplate(templateString, context = {}) {
+        try {
+            return processTemplate(templateString, context);
+        } catch (error) {
+            console.error("处理模板时发生错误:", error);
+            // 出错时返回原始字符串，确保功能不会完全中断
+            return templateString;
+        }
+    }
+    
     // 使主函数在全局或模块系统中可用
     if (typeof define === 'function' && define.amd) { // AMD
         define('dataSimulator', [], function() {
-            return { processTemplate: processTemplate };
+            return { processTemplate: safeProcessTemplate };
         });
     } else if (typeof module === 'object' && module.exports) { // Node.js/CommonJS
-        module.exports = { processTemplate: processTemplate };
+        module.exports = { processTemplate: safeProcessTemplate };
     } else { // 浏览器全局
-        global.dataSimulator = { processTemplate: processTemplate };
+        global.dataSimulator = { processTemplate: safeProcessTemplate };
     }
 
 }(typeof window !== 'undefined' ? window : this));

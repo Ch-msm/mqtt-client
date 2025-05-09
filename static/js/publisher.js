@@ -126,9 +126,17 @@ function publishAutoMessage() {
     
     // 处理消息内容 - 使用数据模拟器处理模板表达式
     const originalMessage = publishElements.payload.value;
-    const processedMessage = window.dataSimulator ? 
-                           dataSimulator.processTemplate(originalMessage, dataSimulatorContext) : 
-                           originalMessage;
+    let processedMessage = originalMessage;
+    
+    try {
+        if (window.dataSimulator && typeof dataSimulator.processTemplate === 'function') {
+            processedMessage = dataSimulator.processTemplate(originalMessage, dataSimulatorContext);
+        }
+    } catch (error) {
+        console.error("处理消息模板时出错:", error);
+        // 发生错误时使用原始消息
+        processedMessage = originalMessage;
+    }
     
     // 更新计数器（仅用于统计）
     autoPublishCount++;
@@ -171,9 +179,17 @@ function publishMessage() {
     
     // 处理消息内容 - 使用数据模拟器处理模板表达式
     const originalMessage = publishElements.payload.value;
-    const processedMessage = window.dataSimulator ? 
-                           dataSimulator.processTemplate(originalMessage, dataSimulatorContext) : 
-                           originalMessage;
+    let processedMessage = originalMessage;
+    
+    try {
+        if (window.dataSimulator && typeof dataSimulator.processTemplate === 'function') {
+            processedMessage = dataSimulator.processTemplate(originalMessage, dataSimulatorContext);
+        }
+    } catch (error) {
+        console.error("处理消息模板时出错:", error);
+        // 发生错误时使用原始消息
+        processedMessage = originalMessage;
+    }
 
     // 验证主题
     if (!topic) {
