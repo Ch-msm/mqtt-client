@@ -48,3 +48,8 @@ window.onMessage = function(message) {
         console.error('订阅者模块未初始化或onMessage方法不可用');
     }
 }; 
+
+// 保存当前客户端数据
+document.getElementById('save-btn').addEventListener('click', function() {
+  console.log('保存当前客户端数据');
+});
