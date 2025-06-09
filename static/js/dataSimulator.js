@@ -13,6 +13,8 @@
  *    例如: [日期格式 YYYY-MM-DD HH:mm:ss]
  * 6. [自增ID 键名 起始值 步长] - 返回自增ID，可指定键名、起始值和步长
  *    例如: [自增ID user 100 1] 生成从100开始，步长为1的自增ID
+ * 7. [累计值 起始值 最小步长-最大步长] - 返回累计值，每次增加一个随机步长
+ *    例如: [累计值 100 1-5] 从100开始，每次增加1到5之间的随机值
  */
 
 (function(global) {
@@ -198,6 +200,63 @@
         return String(idToReturn);
     }
 
+    /**
+     * 处理累计值生成。
+     * @param {string} expression - 表达式字符串，例如 "累计值 100 1-5"。
+     * @param {object} context - 用于存储累计值状态的共享上下文对象。
+     * @returns {string|null} 生成的累计值字符串或无效时返回 null。
+     */
+    function _handleAccumulatedValue(expression, context) {
+        if (!expression.startsWith("累计值 ")) return null;
+
+        try {
+            const paramsString = expression.substring("累计值 ".length).trim();
+            const parts = paramsString.split(/\s+/);
+            
+            if (parts.length !== 2) return null; // 需要两个参数：起始值和步长范围
+            
+            const startValue = parseFloat(parts[0]);
+            if (isNaN(startValue)) return null;
+            
+            // 解析步长范围 (minStep-maxStep)
+            const stepRangeMatch = parts[1].match(/^(-?\d*\.?\d+)-(-?\d*\.?\d+)$/);
+            if (!stepRangeMatch) return null;
+            
+            const minStep = parseFloat(stepRangeMatch[1]);
+            const maxStep = parseFloat(stepRangeMatch[2]);
+            
+            if (isNaN(minStep) || isNaN(maxStep)) return null;
+            
+            // 确保min和max正确排序
+            const actualMinStep = Math.min(minStep, maxStep);
+            const actualMaxStep = Math.max(minStep, maxStep);
+            
+            // 初始化累计值存储
+            if (!context.accumulatedValues) {
+                context.accumulatedValues = {};
+            }
+            
+            // 使用表达式参数作为键，以便同一模板中的多个累计值可以独立工作
+            const key = `${startValue}_${actualMinStep}_${actualMaxStep}`;
+            
+            // 如果这是第一次使用此键，则初始化值
+            if (context.accumulatedValues[key] === undefined) {
+                context.accumulatedValues[key] = startValue;
+            }
+            
+            // 生成随机步长
+            const randomStep = actualMinStep + Math.random() * (actualMaxStep - actualMinStep);
+            
+            // 更新累计值
+            context.accumulatedValues[key] += randomStep;
+            
+            // 返回当前累计值（四舍五入到两位小数）
+            return context.accumulatedValues[key].toFixed(2);
+        } catch (err) {
+            console.error("处理累计值时出错:", err);
+            return null;
+        }
+    }
 
     // --- 主处理函数 ---
 
@@ -210,6 +269,7 @@
      * 4. [随机浮点数 min-max precision] - 指定范围内的随机浮点数，precision为可选参数(默认2位小数)
      * 5. [日期格式 format] - 按指定格式的当前日期
      * 6. [自增ID 键名 起始值 步长] - 自增ID生成
+     * 7. [累计值 起始值 最小步长-最大步长] - 累计值生成，每次增加随机步长
      * 
      * @param {string} templateString - 包含模板表达式的字符串。
      * @param {object} [context={}] - 可选的上下文对象，用于在调用之间维护状态（例如，自增 ID）。
@@ -258,6 +318,13 @@
             replacement = _handleAutoIncrementId(expression, context, singleCallAutoIncrementCache);
             if (replacement !== null) {
                 console.log("自增ID替换:", replacement);
+                return replacement;
+            }
+
+            // 尝试累计值处理
+            replacement = _handleAccumulatedValue(expression, context);
+            if (replacement !== null) {
+                console.log("累计值替换:", replacement);
                 return replacement;
             }
 
