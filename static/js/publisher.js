@@ -41,14 +41,7 @@ function initPublisherHandlers() {
     // 添加发布结果处理器
     WebSocketClient.addHandler('publish', handlePublishResult);
 
-    // 从本地存储加载设置
-    loadPublishSettingsFromLocalStorage();
-    
-    // 添加变更监听器
-    publishElements.topic.addEventListener('change', savePublishSettingsToLocalStorage);
-    publishElements.qos.addEventListener('change', savePublishSettingsToLocalStorage);
-    publishElements.retain.addEventListener('change', savePublishSettingsToLocalStorage);
-    publishElements.frequency.addEventListener('change', savePublishSettingsToLocalStorage);
+    // 移除了旧的本地存储逻辑，现在使用基于客户端ID的配置管理
     
     // 初始化时禁用停止按钮
     publishElements.autoPublishStopBtn.disabled = true;
@@ -233,9 +226,6 @@ function handlePublishResult(data) {
             data.payload.qos,
             data.payload.retain
         );
-        
-        // 保存设置
-        savePublishSettingsToLocalStorage();
     } else {
         showPublishStatus(`发布失败: ${data.error}`, 'status-error');
         // 如果自动发布时失败，停止自动发布
@@ -324,39 +314,7 @@ function renderSentMessages() {
     });
 }
 
-// 保存发布主题和QoS到本地存储
-function savePublishSettingsToLocalStorage() {
-    const settings = {
-        topic: publishElements.topic.value,
-        qos: publishElements.qos.value,
-        retain: publishElements.retain.checked,
-        frequency: publishElements.frequency.value
-    };
-    
-    localStorage.setItem('mqttPublishSettings', JSON.stringify(settings));
-    console.log('发布设置已保存到本地存储');
-}
-
-// 从本地存储加载发布设置
-function loadPublishSettingsFromLocalStorage() {
-    const savedSettings = localStorage.getItem('mqttPublishSettings');
-    
-    if (savedSettings) {
-        try {
-            const settings = JSON.parse(savedSettings);
-            
-            // 填充表单字段
-            if (settings.topic) publishElements.topic.value = settings.topic;
-            if (settings.qos) publishElements.qos.value = settings.qos;
-            if (settings.retain !== undefined) publishElements.retain.checked = settings.retain;
-            if (settings.frequency) publishElements.frequency.value = settings.frequency;
-            
-            console.log('已从本地存储加载发布设置');
-        } catch (err) {
-            console.error('解析保存的发布设置出错:', err);
-        }
-    }
-}
+// 旧的本地存储函数已移除，现在使用基于客户端ID的配置管理
 
 // 当MQTT连接状态变化时更新UI
 function updateUIForConnectionState(isConnected) {
@@ -376,6 +334,5 @@ function updateUIForConnectionState(isConnected) {
 // 导出公共方法
 window.Publisher = {
     init: initPublisherHandlers,
-    saveSettings: savePublishSettingsToLocalStorage,
     updateConnectionState: updateUIForConnectionState
 }; 

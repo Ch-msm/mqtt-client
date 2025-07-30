@@ -475,6 +475,19 @@ h3 i {
     width: 140px;
 }
 
+/* 只读客户端ID输入框样式 */
+#clientId[readonly] {
+    background-color: #f5f5f5 !important;
+    color: #666 !important;
+    cursor: not-allowed !important;
+    border-color: #ccc !important;
+}
+
+#clientId[readonly]:focus {
+    box-shadow: none !important;
+    border-color: #ccc !important;
+}
+
 label[for="port"] {
     margin-left: 4px;
 }

@@ -36,9 +36,6 @@ function initSubscriberHandlers() {
     WebSocketClient.addHandler('unsubscribe', handleUnsubscribeResult);
     WebSocketClient.addHandler('connect', handleReconnect);
     WebSocketClient.addHandler('message', onMessage);
-    
-    // 从本地存储加载订阅设置
-    loadSubscribeSettingsFromLocalStorage();
 }
 
 // 订阅主题
@@ -88,9 +85,6 @@ function handleSubscribeResult(data) {
         
         // 清空输入
         subscribeElements.topic.value = '';
-        
-        // 保存到本地存储
-        saveSubscribeSettingsToLocalStorage();
     } else {
         alert(`订阅失败: ${data.error}`);
     }
@@ -124,9 +118,6 @@ function handleUnsubscribeResult(data) {
         
         // 从活动订阅列表移除
         removeFromActiveSubscriptions(data.payload);
-        
-        // 保存到本地存储
-        saveSubscribeSettingsToLocalStorage();
     } else {
         alert(`取消订阅失败: ${data.error}`);
     }
@@ -143,6 +134,21 @@ function addToActiveSubscriptions(topic, qos) {
     
     // 更新UI
     renderActiveSubscriptions();
+}
+
+// 仅添加到UI显示，不实际订阅（用于配置恢复时的UI显示）
+function addToActiveSubscriptionsUI(topic, qos) {
+    // 确保类型一致
+    topic = String(topic);
+    qos = Number(qos);
+    
+    // 存储订阅信息
+    activeSubscriptions[topic] = { qos };
+    
+    // 更新UI
+    renderActiveSubscriptions();
+    
+    console.log(`已添加到UI: ${topic} (QoS: ${qos})`);
 }
 
 // 从活动订阅列表移除
@@ -276,94 +282,26 @@ function onMessage(message) {
     }
 }
 
-// 保存订阅设置到本地存储
-function saveSubscribeSettingsToLocalStorage() {
-    // 保存当前准备订阅的主题和QoS
-    const currentSettings = {
-        topic: String(subscribeElements.topic.value),
-        qos: Number(subscribeElements.qos.value)
-    };
-    
-    localStorage.setItem('mqttSubscribeSettings', JSON.stringify(currentSettings));
-    
-    // 保存活跃订阅列表
-    const activeSubscriptionsArray = [];
+// 获取当前活动订阅列表
+function getActiveSubscriptions() {
+    const subscriptionsArray = [];
     Object.keys(activeSubscriptions).forEach(topic => {
-        activeSubscriptionsArray.push({
+        subscriptionsArray.push({
             topic: String(topic),
             qos: Number(activeSubscriptions[topic].qos)
         });
     });
-    
-    localStorage.setItem('mqttActiveSubscriptions', JSON.stringify(activeSubscriptionsArray));
-    console.log('已保存活跃订阅到本地存储:', activeSubscriptionsArray);
-}
-
-// 从本地存储加载订阅设置
-function loadSubscribeSettingsFromLocalStorage() {
-    // 加载当前准备订阅的设置
-    const savedSettings = localStorage.getItem('mqttSubscribeSettings');
-    
-    if (savedSettings) {
-        try {
-            const settings = JSON.parse(savedSettings);
-            
-            // 填充表单字段
-            if (settings.topic) subscribeElements.topic.value = String(settings.topic);
-            if (settings.qos !== undefined) subscribeElements.qos.value = Number(settings.qos);
-            
-            console.log('已从本地存储加载订阅设置');
-        } catch (err) {
-            console.error('解析保存的订阅设置出错:', err);
-        }
-    }
-    
-    // 加载活跃订阅列表
-    const savedSubscriptions = localStorage.getItem('mqttActiveSubscriptions');
-    if (savedSubscriptions) {
-        try {
-            const subscriptions = JSON.parse(savedSubscriptions);
-            console.log('从本地存储加载的活跃订阅:', subscriptions);
-            
-            // 填充活跃订阅列表
-            subscriptions.forEach(sub => {
-                if (sub.topic) {
-                    // 添加到活跃订阅列表（但不实际订阅，等连接后再订阅）
-                    addToActiveSubscriptions(String(sub.topic), Number(sub.qos || 0));
-                }
-            });
-            
-            // 如果已连接，则重新订阅上次的活跃订阅
-            if (window.ConnectionManager && window.ConnectionManager.isConnected()) {
-                resubscribeFromLocalStorage();
-            }
-        } catch (err) {
-            console.error('解析保存的活跃订阅出错:', err);
-        }
-    }
-}
-
-// 重新订阅本地存储中的主题
-function resubscribeFromLocalStorage() {
-    if (!window.ConnectionManager.isConnected()) {
-        console.log('未连接到MQTT代理，暂不重新订阅');
-        return;
-    }
-    
-    console.log('开始重新订阅本地存储的主题');
-    Object.keys(activeSubscriptions).forEach(topic => {
-        const qos = activeSubscriptions[topic].qos;
-        console.log(`重新订阅主题: ${topic}, QoS: ${qos}`);
-        subscribeToTopic(String(topic), Number(qos));
-    });
+    return subscriptionsArray;
 }
 
 // 处理重连事件
 function handleReconnect() {
-    console.log('检测到连接事件，准备重新订阅主题');
-    // 延迟一点时间确保连接已稳定
+    console.log('检测到连接事件，触发MQTT连接回调');
+    // 延迟一点时间确保连接已稳定，然后触发全局回调
     setTimeout(() => {
-        resubscribeFromLocalStorage();
+        if (typeof window.onMQTTConnected === 'function') {
+            window.onMQTTConnected();
+        }
     }, 500);
 }
 
@@ -371,7 +309,7 @@ function handleReconnect() {
 window.Subscriber = {
     init: initSubscriberHandlers,
     onMessage: onMessage,
-    loadSubscriptions: loadSubscribeSettingsFromLocalStorage,
-    resubscribe: resubscribeFromLocalStorage,
-    saveSettings: saveSubscribeSettingsToLocalStorage
+    subscribeToTopic: subscribeToTopic,
+    getActiveSubscriptions: getActiveSubscriptions,
+    addToActiveSubscriptionsUI: addToActiveSubscriptionsUI
 }; 

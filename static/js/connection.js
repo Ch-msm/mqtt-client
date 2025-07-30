@@ -37,50 +37,14 @@ const ConnectionStatus = {
     ERROR: 'status-error'
 };
 
-// 存储配置到本地存储
-function saveConfigToLocalStorage() {
-    const config = {
-        broker: elements.broker.value,
-        port: elements.port.value,
-        clientId: elements.clientId.value,
-        username: elements.username.value,
-        // 出于安全考虑，不保存密码
-        // password: elements.password.value
-    };
-    
-    localStorage.setItem('mqttConfig', JSON.stringify(config));
-    console.log('连接配置已保存到本地存储');
-}
+// 旧的本地存储配置函数已移除，现在使用基于客户端ID的配置管理
 
-// 从本地存储加载配置
-function loadConfigFromLocalStorage() {
-    const savedConfig = localStorage.getItem('mqttConfig');
-    
-    if (savedConfig) {
-        try {
-            const config = JSON.parse(savedConfig);
-            
-            // 填充表单字段
-            if (config.broker) elements.broker.value = config.broker;
-            if (config.port) elements.port.value = config.port;
-            if (config.clientId) elements.clientId.value = config.clientId;
-            if (config.username) elements.username.value = config.username;
-            // 密码不从本地存储加载
-            
-            console.log('已从本地存储加载MQTT配置');
-        } catch (err) {
-            console.error('解析保存的配置出错:', err);
-        }
-    }
-}
+// 旧的本地存储配置加载函数已移除，现在使用基于客户端ID的配置管理
 
 // 初始化事件处理
 function initConnectionHandlers() {
-    // 从本地存储加载配置
-    loadConfigFromLocalStorage();
-    
-    // 生成默认客户端ID（如果为空）
-    if (!elements.clientId.value) {
+    // 生成默认客户端ID（如果为空且不是只读）
+    if (!elements.clientId.value && !elements.clientId.readOnly) {
         elements.clientId.value = `web_mqtt_${Math.random().toString(16).substr(2, 8)}`;
     }
 
@@ -98,12 +62,6 @@ function initConnectionHandlers() {
     WebSocketClient.addHandler('disconnect', handleMQTTDisconnected);
     WebSocketClient.addHandler('error', handleError);
     WebSocketClient.addHandler('message', handleIncomingMessage);
-    
-    // 监听输入变化以保存配置
-    elements.broker.addEventListener('change', saveConfigToLocalStorage);
-    elements.port.addEventListener('change', saveConfigToLocalStorage);
-    elements.clientId.addEventListener('change', saveConfigToLocalStorage);
-    elements.username.addEventListener('change', saveConfigToLocalStorage);
     
     console.log('连接管理模块初始化完成');
 }
@@ -132,8 +90,7 @@ function connectToBroker() {
         password
     };
     
-    // 保存配置到本地存储
-    saveConfigToLocalStorage();
+    // 旧的本地存储逻辑已移除
 
     try {
         // 更新状态为连接中
@@ -168,6 +125,13 @@ function handleMQTTConnected(data) {
     isConnectedToMQTT = true;
     updateConnectionStatus('已连接', ConnectionStatus.CONNECTED);
     updateUIForConnectedState(true);
+    
+    // 触发MQTT连接成功回调，用于恢复订阅
+    setTimeout(() => {
+        if (typeof window.onMQTTConnected === 'function') {
+            window.onMQTTConnected();
+        }
+    }, 500);
 }
 
 // 处理MQTT断开连接
@@ -263,6 +227,5 @@ window.ConnectionManager = {
     init: initConnectionHandlers,
     connect: connectToBroker,
     disconnect: disconnectFromBroker,
-    isConnected: isMQTTConnected,
-    saveConfig: saveConfigToLocalStorage
+    isConnected: isMQTTConnected
 }; 
